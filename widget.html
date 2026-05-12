@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  :root {
+    --bg: rgba(28, 28, 30, 0.72);
+    --text: #f5f5f7;
+    --muted: #8e8e93;
+    --green: #30d158;
+    --red: #ff453a;
+    --border: rgba(255,255,255,0.06);
+    --hover: rgba(255,255,255,0.05);
+    --card-bg: rgba(255,255,255,0.04);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: var(--text);
+    height: 100%;
+    overflow: hidden;
+  }
+  .container {
+    background: var(--bg);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 16px;
+    padding-top: 22px;
+    height: 100%;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 0.5px 0 rgba(255,255,255,0.08);
+  }
+  .container::-webkit-scrollbar { width: 3px; }
+  .container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+  .container::-webkit-scrollbar-track { background: transparent; }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; padding: 2px 4px;
+  }
+  .title { font-size: 13px; font-weight: 700; letter-spacing: -0.2px; opacity: 0.9; }
+  .ts { font-size: 9px; color: var(--muted); font-weight: 500; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 12px; padding: 3px; background: rgba(0,0,0,0.25); border-radius: 10px; -webkit-app-region: no-drag; }
+  .tab {
+    flex: 1; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    border: none; background: transparent; color: var(--muted);
+    cursor: pointer; transition: all .2s; text-align: center;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: rgba(255,255,255,0.1); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .tf-bar {
+    display: flex; gap: 2px; margin: 8px 0 12px; padding: 3px;
+    background: rgba(0,0,0,0.25); border-radius: 8px; width: fit-content;
+    -webkit-app-region: no-drag;
+  }
+  .tf-btn {
+    padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 600;
+    color: var(--muted); cursor: pointer; border: none; background: none;
+    transition: all .15s;
+  }
+  .tf-btn:hover { color: var(--text); }
+  .tf-btn.active { color: var(--text); background: rgba(255,255,255,0.12); }
+  .section-lbl {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.6px; margin: 12px 0 6px 4px;
+  }
+  .section-lbl.green { color: var(--green); }
+  .section-lbl.red { color: var(--red); }
+  .stock-list { -webkit-app-region: no-drag; }
+  .stock-row {
+    display: grid; grid-template-columns: 20px 1fr 76px 64px 26px;
+    align-items: center; gap: 4px; padding: 6px 6px; border-radius: 10px;
+    transition: background .15s;
+  }
+  .stock-row:hover { background: var(--hover); }
+  .rank { font-size: 9px; font-weight: 700; color: var(--muted); text-align: center; }
+  .ticker { font-size: 12px; font-weight: 700; letter-spacing: -0.1px; }
+  .price { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .change {
+    font-size: 11px; font-weight: 700; text-align: right; padding: 3px 6px;
+    border-radius: 6px; white-space: nowrap;
+  }
+  .change.up { color: var(--green); background: rgba(48,209,88,0.12); }
+  .change.down { color: var(--red); background: rgba(255,69,58,0.12); }
+  .arrows { display: flex; flex-direction: column; align-items: center; }
+  .arrow {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 9px; line-height: 1.2; padding: 1px;
+  }
+  .arrow:hover { color: var(--text); }
+  .arrow:disabled { opacity: 0.15; cursor: default; }
+  .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 12px; font-weight: 500; }
+  .indices {
+    display: flex; gap: 8px; margin-bottom: 14px;
+  }
+  .index-card {
+    flex: 1; padding: 10px 12px; border-radius: 12px;
+    background: var(--card-bg); border: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .index-card:hover { background: rgba(255,255,255,0.06); }
+  .index-name { font-size: 9px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  .index-price { font-size: 15px; font-weight: 700; margin: 3px 0 2px; letter-spacing: -0.3px; }
+  .index-change { font-size: 11px; font-weight: 600; }
+  .index-change.up { color: var(--green); }
+  .index-change.down { color: var(--red); }
+  .index-spark { margin-top: 5px; }
+  .add-remove-bar {
+    display: flex; gap: 6px; margin: 8px 0 12px; align-items: center;
+  }
+  .add-input {
+    flex: 1; padding: 7px 12px; border-radius: 10px; font-size: 11px;
+    border: 1px solid var(--border); background: rgba(0,0,0,0.2);
+    color: var(--text); outline: none; font-weight: 500;
+  }
+  .add-input:focus { border-color: rgba(255,255,255,0.18); background: rgba(0,0,0,0.3); }
+  .add-input::placeholder { color: var(--muted); }
+  .add-btn, .remove-btn {
+    padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 700;
+    border: none; cursor: pointer; transition: all .15s;
+  }
+  .add-btn { background: rgba(48,209,88,0.15); color: var(--green); }
+  .add-btn:hover { background: rgba(48,209,88,0.25); }
+  .remove-btn {
+    background: rgba(255,69,58,0.1); color: var(--red); font-size: 9px;
+    padding: 3px 7px; border-radius: 6px; margin-left: auto; cursor: pointer;
+  }
+  .remove-btn:hover { background: rgba(255,69,58,0.2); }
+  .stock-row-all {
+    display: grid; grid-template-columns: 20px 1fr 76px 64px 26px 22px;
+    align-items: center; gap: 4px; padding: 6px 6px; border-radius: 10px;
+    transition: background .15s;
+  }
+  .stock-row-all:hover { background: var(--hover); }
+  .earnings-lbl { color: #ffd740; margin-top: 18px; }
+  .earnings-list { padding: 0; }
+  .earnings-row {
+    display: grid; grid-template-columns: 60px 1fr auto;
+    align-items: center; gap: 6px; padding: 6px 8px; border-radius: 10px;
+    transition: background .15s; border-left: 2px solid transparent;
+  }
+  .earnings-row:hover { background: var(--hover); }
+  .earnings-today { border-left-color: #ffd740; background: rgba(255,215,64,0.04); }
+  .earnings-ticker { font-size: 12px; font-weight: 700; letter-spacing: -0.1px; }
+  .earnings-date { font-size: 11px; color: var(--muted); }
+  .earnings-meta { font-size: 10px; color: var(--muted); text-align: right; }
+</style>
+</head>
+<body>
+<div class="container" id="root">
+  <div class="loading">⏳ Loading stock data...</div>
+</div>
+
+<script>
+let allStocks = [];
+let indicesData = [];
+let earningsData = [];
+let currentView = 'movers';
+let currentTf = '1D';
+let customOrder = null;
+
+function sparkSvg(data, up, w, h) {
+  w = w || 76; h = h || 22;
+  if (!data || data.length < 2) return '';
+  const pad = 2;
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const y = pad + (1 - (v - min) / range) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const color = up ? '#30d158' : '#ff453a';
+  const fill = up ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)';
+  const lastX = (w - pad * 2).toFixed(1);
+  const bottomY = (h - pad).toFixed(1);
+  const firstX = pad.toFixed(1);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <path d="M${firstX},${bottomY} L${pts.join(' L')} L${lastX},${bottomY} Z" fill="${fill}"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function indexCard(idx) {
+  const tf = idx.timeframes[currentTf];
+  if (!tf) return '';
+  const up = tf.change_pct >= 0;
+  const sign = up ? '+' : '';
+  const cls = up ? 'up' : 'down';
+  return `<div class="index-card">
+    <div class="index-name">${idx.name}</div>
+    <div class="index-price">$${idx.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+    <div class="index-change ${cls}">${sign}${tf.change_pct.toFixed(2)}%</div>
+    <div class="index-spark">${sparkSvg(tf.sparkline, up, 140, 20)}</div>
+  </div>`;
+}
+
+function stockRow(s, idx, total, listId) {
+  const tf = s.timeframes[currentTf];
+  if (!tf) return '';
+  const up = tf.change_pct >= 0;
+  const sign = up ? '+' : '';
+  const cls = up ? 'up' : 'down';
+  return `<div class="stock-row">
+    <span class="rank">${idx + 1}</span>
+    <div><div class="ticker">${s.ticker}</div><div class="price">$${s.price.toFixed(2)}</div></div>
+    <span>${sparkSvg(tf.sparkline, up)}</span>
+    <span class="change ${cls}">${sign}${tf.change_pct.toFixed(2)}%</span>
+    <span class="arrows">
+      <button class="arrow" ${idx === 0 ? 'disabled' : ''} onclick="moveStock('${listId}',${idx},-1)">▲</button>
+      <button class="arrow" ${idx === total - 1 ? 'disabled' : ''} onclick="moveStock('${listId}',${idx},1)">▼</button>
+    </span>
+  </div>`;
+}
+
+function stockRowAll(s, idx, total) {
+  const tf = s.timeframes[currentTf];
+  if (!tf) return '';
+  const up = tf.change_pct >= 0;
+  const sign = up ? '+' : '';
+  const cls = up ? 'up' : 'down';
+  return `<div class="stock-row-all">
+    <span class="rank">${idx + 1}</span>
+    <div><div class="ticker">${s.ticker}</div><div class="price">$${s.price.toFixed(2)}</div></div>
+    <span>${sparkSvg(tf.sparkline, up)}</span>
+    <span class="change ${cls}">${sign}${tf.change_pct.toFixed(2)}%</span>
+    <span class="arrows">
+      <button class="arrow" ${idx === 0 ? 'disabled' : ''} onclick="moveStock('a',${idx},-1)">▲</button>
+      <button class="arrow" ${idx === total - 1 ? 'disabled' : ''} onclick="moveStock('a',${idx},1)">▼</button>
+    </span>
+    <span class="remove-btn" onclick="removeTicker('${s.ticker}')">✕</span>
+  </div>`;
+}
+
+function earningsSection() {
+  if (!earningsData.length) return '';
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = earningsData.map(e => {
+    const d = new Date(e.date + 'T12:00:00');
+    const day = d.toLocaleDateString('en-US', {weekday: 'short'});
+    const dateStr = d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    const isToday = e.date === today;
+    const eps = e.eps_estimate !== null ? `EPS est: $${e.eps_estimate}` : '';
+    const timeStr = e.time ? (parseInt(e.time) < 10 ? 'Pre-mkt' : parseInt(e.time) >= 16 ? 'After-hrs' : '') : '';
+    return `<div class="earnings-row${isToday ? ' earnings-today' : ''}">
+      <span class="earnings-ticker">${e.ticker}</span>
+      <span class="earnings-date">${isToday ? '📅 Today' : `${day}, ${dateStr}`}</span>
+      <span class="earnings-meta">${[timeStr, eps].filter(Boolean).join(' • ')}</span>
+    </div>`;
+  }).join('');
+  return `
+    <div class="section-lbl earnings-lbl">📊 Upcoming Earnings (15 days)</div>
+    <div class="earnings-list">${rows}</div>
+  `;
+}
+
+function render() {
+  const withTf = allStocks.filter(s => s.timeframes && s.timeframes[currentTf]);
+  const sorted = [...withTf].sort((a, b) =>
+    (b.timeframes[currentTf]?.change_pct || 0) - (a.timeframes[currentTf]?.change_pct || 0));
+
+  const tfBtns = ['1D','1W','1M','3M','6M'].map(t =>
+    `<button class="tf-btn ${t === currentTf ? 'active' : ''}" onclick="setTf('${t}')">${t}</button>`
+  ).join('');
+
+  // Indices
+  const indicesHtml = indicesData.length ? `<div class="indices">${indicesData.map(i => indexCard(i)).join('')}</div>` : '';
+
+  let body = '';
+  if (currentView === 'movers') {
+    const gainers = sorted.slice(0, 10);
+    const losers = sorted.slice(-10).sort((a,b) => (a.timeframes[currentTf]?.change_pct||0) - (b.timeframes[currentTf]?.change_pct||0));
+    body = `
+      <div class="section-lbl green">🚀 Top 10 Gainers</div>
+      <div class="stock-list">${gainers.map((s,i) => stockRow(s, i, 10, 'g')).join('')}</div>
+      <div class="section-lbl red">📉 Top 10 Losers</div>
+      <div class="stock-list">${losers.map((s,i) => stockRow(s, i, 10, 'l')).join('')}</div>
+      ${earningsSection()}
+    `;
+  } else {
+    let ordered = sorted;
+    if (customOrder) {
+      const map = Object.fromEntries(withTf.map(s => [s.ticker, s]));
+      ordered = customOrder.map(t => map[t]).filter(Boolean);
+      const have = new Set(customOrder);
+      withTf.forEach(s => { if (!have.has(s.ticker)) ordered.push(s); });
+    }
+    body = `
+      <div class="tf-bar">${tfBtns}</div>
+      <div class="add-remove-bar">
+        <input class="add-input" id="addTickerInput" type="text" placeholder="Add ticker (e.g. TSLA)" onkeydown="if(event.key==='Enter')addTicker()">
+        <button class="add-btn" onclick="addTicker()">+ Add</button>
+      </div>
+      <div class="stock-list">${ordered.map((s,i) => stockRowAll(s, i, ordered.length)).join('')}</div>
+    `;
+  }
+
+  const ts = window._lastUpdated ? new Date(window._lastUpdated * 1000).toLocaleTimeString() : '';
+  document.getElementById('root').innerHTML = `
+    <div class="header">
+      <span class="title">📈 Stock Movers</span>
+      <span class="ts">${ts} • ${allStocks.length} stocks</span>
+    </div>
+    ${indicesHtml}
+    <div class="tabs">
+      <span class="tab ${currentView === 'movers' ? 'active' : ''}" onclick="setView('movers')">Top Movers</span>
+      <span class="tab ${currentView === 'all' ? 'active' : ''}" onclick="setView('all')">All Stocks</span>
+    </div>
+    ${currentView === 'movers' ? `<div class="tf-bar">${tfBtns}</div>` : ''}
+    ${body}
+  `;
+}
+
+function setView(v) { currentView = v; render(); }
+function setTf(t) { currentTf = t; render(); }
+
+function moveStock(list, idx, dir) {
+  if (list !== 'a') return;
+  const withTf = allStocks.filter(s => s.timeframes && s.timeframes[currentTf]);
+  if (!customOrder) {
+    customOrder = [...withTf].sort((a,b) =>
+      (b.timeframes[currentTf]?.change_pct||0) - (a.timeframes[currentTf]?.change_pct||0)
+    ).map(s => s.ticker);
+  }
+  const target = idx + dir;
+  if (target < 0 || target >= customOrder.length) return;
+  [customOrder[idx], customOrder[target]] = [customOrder[target], customOrder[idx]];
+  render();
+}
+
+async function addTicker() {
+  const input = document.getElementById('addTickerInput');
+  const ticker = input.value.trim().toUpperCase();
+  if (!ticker) return;
+  await fetch('http://127.0.0.1:5051/api/tickers/add', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ticker})
+  });
+  input.value = '';
+  // Wait for refresh then re-fetch
+  setTimeout(fetchData, 5000);
+}
+
+async function removeTicker(ticker) {
+  await fetch('http://127.0.0.1:5051/api/tickers/remove', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ticker})
+  });
+  allStocks = allStocks.filter(s => s.ticker !== ticker);
+  if (customOrder) customOrder = customOrder.filter(t => t !== ticker);
+  render();
+}
+
+async function fetchData() {
+  try {
+    const resp = await fetch('http://127.0.0.1:5051/api/stocks');
+    const data = await resp.json();
+    if (data.stocks && data.stocks.length) {
+      allStocks = data.stocks;
+      indicesData = data.indices || [];
+      earningsData = data.earnings || [];
+      window._lastUpdated = data.updated;
+      render();
+    }
+  } catch(e) {
+    console.error('Fetch failed:', e);
+  }
+}
+
+fetchData();
+setInterval(fetchData, 60000);
+</script>
+</body>
+</html>
