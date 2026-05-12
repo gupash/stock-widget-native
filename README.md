@@ -19,11 +19,35 @@ A native macOS desktop widget that tracks stock prices with live updates. Built 
 
 ## Requirements
 
-- macOS 14+ (Sonoma)
-- Python 3.11+ with `yfinance` installed
-- No Xcode required (compiles with `swiftc`)
+- macOS 14+ (Sonoma, Apple Silicon)
+- No Xcode required
 
-## Install
+## Install via Homebrew (Recommended)
+
+```bash
+brew install gupash/stock-widget/stock-widget
+brew services start stock-widget
+stock-widget
+```
+
+That's it. Homebrew handles Python, yfinance, Swift compilation, and app installation.
+
+**Manage the service:**
+```bash
+brew services start stock-widget   # start data server (auto-starts on login)
+brew services stop stock-widget    # stop data server
+brew services restart stock-widget # restart data server
+```
+
+**Launch the widget:**
+```bash
+stock-widget                       # CLI command
+open -a "Stock Widget"             # or via Spotlight → "Stock Widget"
+```
+
+**Hide/Show:** Use the 📈 menubar icon → Show Widget / Hide Widget / Quit.
+
+## Manual Install
 
 ```bash
 # Install Python dependency
@@ -40,17 +64,9 @@ cp Info.plist StockWidget.app/Contents/Info.plist
 
 # Install to Applications (for Spotlight)
 cp -R StockWidget.app "/Applications/Stock Widget.app"
-```
 
-## Usage
-
-```bash
-# Start the data server + app
+# Start
 ./start.sh
-
-# Or manually:
-python3 server.py &   # starts API on http://127.0.0.1:5051
-open -a "Stock Widget"
 ```
 
 ## Architecture
