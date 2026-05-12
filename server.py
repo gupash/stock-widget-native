@@ -58,8 +58,6 @@ def fetch_stocks():
     import yfinance as yf
     global cache_data
     tickers = load_tickers()
-    all_symbols = tickers + INDICES
-    tickers_str = " ".join(all_symbols)
     stocks = {}
     indices = []
 
@@ -67,7 +65,15 @@ def fetch_stocks():
         tf_data = {}
         for tf_key, (period, interval) in TIMEFRAMES.items():
             tf_data[tf_key] = yf.download(
-                tickers_str, period=period, interval=interval,
+                " ".join(tickers), period=period, interval=interval,
+                group_by="ticker", progress=False
+            )
+
+        # Fetch indices separately for reliability
+        idx_tf_data = {}
+        for tf_key, (period, interval) in TIMEFRAMES.items():
+            idx_tf_data[tf_key] = yf.download(
+                " ".join(INDICES), period=period, interval=interval,
                 group_by="ticker", progress=False
             )
 
@@ -75,7 +81,7 @@ def fetch_stocks():
         for idx_sym in INDICES:
             try:
                 entry = {"ticker": idx_sym, "name": "S&P 500" if "GSPC" in idx_sym else "NASDAQ", "timeframes": {}}
-                for tf_key, hist in tf_data.items():
+                for tf_key, hist in idx_tf_data.items():
                     df = hist[idx_sym] if idx_sym in hist.columns.get_level_values(0) else None
                     if df is None or df.empty:
                         continue
@@ -134,23 +140,30 @@ def fetch_stocks():
                 continue
 
         # Fix daily with prev close
-        daily2 = yf.download(tickers_str, period="2d", interval="1d",
+        daily2 = yf.download(" ".join(tickers), period="2d", interval="1d",
                              group_by="ticker", progress=False)
-        for t in list(stocks.keys()) + [i["ticker"] for i in indices]:
+        for t in stocks.keys():
             try:
                 ddf = daily2[t] if t in daily2.columns.get_level_values(0) else None
                 if ddf is not None and len(ddf) >= 2:
                     prev_close = float(ddf["Close"].dropna().iloc[-2])
-                    if t in stocks:
-                        price = stocks[t]["price"]
-                        stocks[t]["timeframes"]["1D"]["change_pct"] = round(
-                            ((price - prev_close) / prev_close) * 100, 2)
-                    else:
-                        for idx_entry in indices:
-                            if idx_entry["ticker"] == t:
-                                price = idx_entry["price"]
-                                idx_entry["timeframes"]["1D"]["change_pct"] = round(
-                                    ((price - prev_close) / prev_close) * 100, 2)
+                    price = stocks[t]["price"]
+                    stocks[t]["timeframes"]["1D"]["change_pct"] = round(
+                        ((price - prev_close) / prev_close) * 100, 2)
+            except Exception:
+                continue
+
+        daily2_idx = yf.download(" ".join(INDICES), period="2d", interval="1d",
+                                 group_by="ticker", progress=False)
+        for idx_entry in indices:
+            try:
+                t = idx_entry["ticker"]
+                ddf = daily2_idx[t] if t in daily2_idx.columns.get_level_values(0) else None
+                if ddf is not None and len(ddf) >= 2:
+                    prev_close = float(ddf["Close"].dropna().iloc[-2])
+                    price = idx_entry["price"]
+                    idx_entry["timeframes"]["1D"]["change_pct"] = round(
+                        ((price - prev_close) / prev_close) * 100, 2)
             except Exception:
                 continue
     except Exception as e:
