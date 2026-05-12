@@ -9,6 +9,9 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
+# Ensure yfinance has a writable cache directory
+os.environ.setdefault("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+
 CACHE = os.path.expanduser("~/.stock-widget-cache.json")
 TICKERS_FILE = os.path.expanduser("~/.stock-widget-tickers.json")
 
