@@ -71,7 +71,7 @@
   .section-lbl.red { color: var(--red); }
   .stock-list { -webkit-app-region: no-drag; }
   .stock-row {
-    display: grid; grid-template-columns: 20px 1fr 76px 64px 26px;
+    display: grid; grid-template-columns: 20px 1fr 76px 64px;
     align-items: center; gap: 4px; padding: 6px 6px; border-radius: 10px;
     transition: background .15s;
   }
@@ -198,8 +198,21 @@ function indexCard(idx) {
   </div>`;
 }
 
-function stockRow(s, idx, total, listId) {
-  const tf = s.timeframes[currentTf];
+function getTf(s) {
+  if (s.timeframes[currentTf]) return s.timeframes[currentTf];
+  for (const t of ['1D','1W','1M','3M','6M']) {
+    if (s.timeframes[t]) return s.timeframes[t];
+  }
+  return null;
+}
+
+function getChangePct(s) {
+  const tf = getTf(s);
+  return tf ? tf.change_pct : 0;
+}
+
+function stockRow(s, idx) {
+  const tf = getTf(s);
   if (!tf) return '';
   const up = tf.change_pct >= 0;
   const sign = up ? '+' : '';
@@ -209,15 +222,11 @@ function stockRow(s, idx, total, listId) {
     <div><div class="ticker">${s.ticker}</div><div class="price">$${s.price.toFixed(2)}</div></div>
     <span>${sparkSvg(tf.sparkline, up)}</span>
     <span class="change ${cls}">${sign}${tf.change_pct.toFixed(2)}%</span>
-    <span class="arrows">
-      <button class="arrow" ${idx === 0 ? 'disabled' : ''} onclick="moveStock('${listId}',${idx},-1)">▲</button>
-      <button class="arrow" ${idx === total - 1 ? 'disabled' : ''} onclick="moveStock('${listId}',${idx},1)">▼</button>
-    </span>
   </div>`;
 }
 
 function stockRowAll(s, idx, total) {
-  const tf = s.timeframes[currentTf];
+  const tf = getTf(s);
   if (!tf) return '';
   const up = tf.change_pct >= 0;
   const sign = up ? '+' : '';
@@ -258,9 +267,8 @@ function earningsSection() {
 }
 
 function render() {
-  const withTf = allStocks.filter(s => s.timeframes && s.timeframes[currentTf]);
-  const sorted = [...withTf].sort((a, b) =>
-    (b.timeframes[currentTf]?.change_pct || 0) - (a.timeframes[currentTf]?.change_pct || 0));
+  const withData = allStocks.filter(s => s.timeframes && Object.keys(s.timeframes).length > 0);
+  const sorted = [...withData].sort((a, b) => getChangePct(b) - getChangePct(a));
 
   const tfBtns = ['1D','1W','1M','3M','6M'].map(t =>
     `<button class="tf-btn ${t === currentTf ? 'active' : ''}" onclick="setTf('${t}')">${t}</button>`
@@ -272,21 +280,21 @@ function render() {
   let body = '';
   if (currentView === 'movers') {
     const gainers = sorted.slice(0, 10);
-    const losers = sorted.slice(-10).sort((a,b) => (a.timeframes[currentTf]?.change_pct||0) - (b.timeframes[currentTf]?.change_pct||0));
+    const losers = sorted.slice(-10).sort((a,b) => getChangePct(a) - getChangePct(b));
     body = `
       <div class="section-lbl green">🚀 Top 10 Gainers</div>
-      <div class="stock-list">${gainers.map((s,i) => stockRow(s, i, 10, 'g')).join('')}</div>
+      <div class="stock-list">${gainers.map((s,i) => stockRow(s, i)).join('')}</div>
       <div class="section-lbl red">📉 Top 10 Losers</div>
-      <div class="stock-list">${losers.map((s,i) => stockRow(s, i, 10, 'l')).join('')}</div>
+      <div class="stock-list">${losers.map((s,i) => stockRow(s, i)).join('')}</div>
       ${earningsSection()}
     `;
   } else {
     let ordered = sorted;
     if (customOrder) {
-      const map = Object.fromEntries(withTf.map(s => [s.ticker, s]));
+      const map = Object.fromEntries(withData.map(s => [s.ticker, s]));
       ordered = customOrder.map(t => map[t]).filter(Boolean);
       const have = new Set(customOrder);
-      withTf.forEach(s => { if (!have.has(s.ticker)) ordered.push(s); });
+      withData.forEach(s => { if (!have.has(s.ticker)) ordered.push(s); });
     }
     body = `
       <div class="tf-bar">${tfBtns}</div>
@@ -319,11 +327,9 @@ function setTf(t) { currentTf = t; render(); }
 
 function moveStock(list, idx, dir) {
   if (list !== 'a') return;
-  const withTf = allStocks.filter(s => s.timeframes && s.timeframes[currentTf]);
+  const withData = allStocks.filter(s => s.timeframes && Object.keys(s.timeframes).length > 0);
   if (!customOrder) {
-    customOrder = [...withTf].sort((a,b) =>
-      (b.timeframes[currentTf]?.change_pct||0) - (a.timeframes[currentTf]?.change_pct||0)
-    ).map(s => s.ticker);
+    customOrder = [...withData].sort((a,b) => getChangePct(b) - getChangePct(a)).map(s => s.ticker);
   }
   const target = idx + dir;
   if (target < 0 || target >= customOrder.length) return;
