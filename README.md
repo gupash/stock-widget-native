@@ -47,6 +47,12 @@ open -a "Stock Widget"             # or via Spotlight → "Stock Widget"
 
 **Hide/Show:** Use the 📈 menubar icon → Show Widget / Hide Widget / Quit.
 
+## Stock List
+
+The widget ships with a default list of ~50 stocks (a personal watchlist). You can add or remove tickers directly from the widget UI using the **All Stocks** tab — type a ticker in the text box and click **+ Add**, or click **✕** next to any stock to remove it. Your custom list is saved to `~/.stock-widget-tickers.json` and persists across restarts.
+
+> **Future:** If the widget gains traction, we plan to add support for providing a custom initial stock list (e.g. via a config file or CLI flag) to replace the default set entirely.
+
 ## Manual Install
 
 ```bash
