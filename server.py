@@ -117,7 +117,13 @@ def fetch_stocks():
                         continue
                     price = float(closes[-1])
                     start = float(closes[0])
+                    if start <= 0:
+                        continue
                     change_pct = ((price - start) / start) * 100
+                    # Sanity bounds: reject clearly erroneous values
+                    max_reasonable = {"1D": 50, "1W": 80, "1M": 150, "3M": 300, "6M": 500}
+                    if abs(change_pct) > max_reasonable.get(tf_key, 500):
+                        continue
                     step = max(1, len(closes) // 20)
                     spark = closes[::step]
                     entry["timeframes"][tf_key] = {
@@ -139,31 +145,41 @@ def fetch_stocks():
             except Exception:
                 continue
 
-        # Fix daily with prev close
-        daily2 = yf.download(" ".join(tickers), period="2d", interval="1d",
+        # Fix daily with prev close (more reliable than intraday start)
+        daily2 = yf.download(" ".join(tickers), period="5d", interval="1d",
                              group_by="ticker", progress=False)
         for t in stocks.keys():
             try:
                 ddf = daily2[t] if t in daily2.columns.get_level_values(0) else None
-                if ddf is not None and len(ddf) >= 2:
-                    prev_close = float(ddf["Close"].dropna().iloc[-2])
+                if ddf is None:
+                    continue
+                closes = ddf["Close"].dropna()
+                if len(closes) >= 2:
+                    prev_close = float(closes.iloc[-2])
                     price = stocks[t]["price"]
-                    stocks[t]["timeframes"]["1D"]["change_pct"] = round(
-                        ((price - prev_close) / prev_close) * 100, 2)
+                    if prev_close > 0:
+                        daily_change = ((price - prev_close) / prev_close) * 100
+                        if abs(daily_change) <= 50:
+                            stocks[t]["timeframes"]["1D"]["change_pct"] = round(daily_change, 2)
             except Exception:
                 continue
 
-        daily2_idx = yf.download(" ".join(INDICES), period="2d", interval="1d",
+        daily2_idx = yf.download(" ".join(INDICES), period="5d", interval="1d",
                                  group_by="ticker", progress=False)
         for idx_entry in indices:
             try:
                 t = idx_entry["ticker"]
                 ddf = daily2_idx[t] if t in daily2_idx.columns.get_level_values(0) else None
-                if ddf is not None and len(ddf) >= 2:
-                    prev_close = float(ddf["Close"].dropna().iloc[-2])
+                if ddf is None:
+                    continue
+                closes = ddf["Close"].dropna()
+                if len(closes) >= 2:
+                    prev_close = float(closes.iloc[-2])
                     price = idx_entry["price"]
-                    idx_entry["timeframes"]["1D"]["change_pct"] = round(
-                        ((price - prev_close) / prev_close) * 100, 2)
+                    if prev_close > 0:
+                        daily_change = ((price - prev_close) / prev_close) * 100
+                        if abs(daily_change) <= 20:
+                            idx_entry["timeframes"]["1D"]["change_pct"] = round(daily_change, 2)
             except Exception:
                 continue
     except Exception as e:
@@ -172,7 +188,14 @@ def fetch_stocks():
 
     result = list(stocks.values())
     with lock:
-        cache_data = {"stocks": result, "indices": indices, "updated": time.time()}
+        # Preserve earnings from previous fetch (avoid intermittent disappearance)
+        prev_earnings = cache_data.get("earnings", [])
+        cache_data = {
+            "stocks": result,
+            "indices": indices if indices else cache_data.get("indices", []),
+            "earnings": prev_earnings,
+            "updated": time.time(),
+        }
     try:
         with open(CACHE, "w") as f:
             json.dump(cache_data, f)

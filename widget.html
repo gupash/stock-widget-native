@@ -92,6 +92,10 @@
   }
   .arrow:hover { color: var(--text); }
   .arrow:disabled { opacity: 0.15; cursor: default; }
+  .stock-row-all { cursor: grab; user-select: none; }
+  .stock-row-all:active { cursor: grabbing; }
+  .stock-row-all.dragging { opacity: 0.3; }
+  .stock-row-all.drag-over { border-top: 2px solid rgba(48,209,88,0.7); margin-top: -2px; }
   .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 12px; font-weight: 500; }
   .indices {
     display: flex; gap: 8px; margin-bottom: 14px;
@@ -130,7 +134,7 @@
   }
   .remove-btn:hover { background: rgba(255,69,58,0.2); }
   .stock-row-all {
-    display: grid; grid-template-columns: 20px 1fr 76px 64px 26px 22px;
+    display: grid; grid-template-columns: 20px 1fr 76px 64px 22px;
     align-items: center; gap: 4px; padding: 6px 6px; border-radius: 10px;
     transition: background .15s;
   }
@@ -231,16 +235,15 @@ function stockRowAll(s, idx, total) {
   const up = tf.change_pct >= 0;
   const sign = up ? '+' : '';
   const cls = up ? 'up' : 'down';
-  return `<div class="stock-row-all">
+  return `<div class="stock-row-all" draggable="true" data-idx="${idx}"
+    ondragstart="onDragStart(event,${idx})" ondragend="onDragEnd(event)"
+    ondragover="onDragOver(event)" ondragenter="onDragEnter(event,${idx})" ondragleave="onDragLeave(event)"
+    ondrop="onDrop(event,${idx})">
     <span class="rank">${idx + 1}</span>
     <div><div class="ticker">${s.ticker}</div><div class="price">$${s.price.toFixed(2)}</div></div>
     <span>${sparkSvg(tf.sparkline, up)}</span>
     <span class="change ${cls}">${sign}${tf.change_pct.toFixed(2)}%</span>
-    <span class="arrows">
-      <button class="arrow" ${idx === 0 ? 'disabled' : ''} onclick="moveStock('a',${idx},-1)">▲</button>
-      <button class="arrow" ${idx === total - 1 ? 'disabled' : ''} onclick="moveStock('a',${idx},1)">▼</button>
-    </span>
-    <span class="remove-btn" onclick="removeTicker('${s.ticker}')">✕</span>
+    <span class="remove-btn" onclick="event.stopPropagation();removeTicker('${s.ticker}')">✕</span>
   </div>`;
 }
 
@@ -279,8 +282,8 @@ function render() {
 
   let body = '';
   if (currentView === 'movers') {
-    const gainers = sorted.slice(0, 10);
-    const losers = sorted.slice(-10).sort((a,b) => getChangePct(a) - getChangePct(b));
+    const gainers = sorted.filter(s => getChangePct(s) > 0).slice(0, 10);
+    const losers = sorted.filter(s => getChangePct(s) < 0).sort((a,b) => getChangePct(a) - getChangePct(b)).slice(0, 10);
     body = `
       <div class="section-lbl green">🚀 Top 10 Gainers</div>
       <div class="stock-list">${gainers.map((s,i) => stockRow(s, i)).join('')}</div>
@@ -325,15 +328,48 @@ function render() {
 function setView(v) { currentView = v; render(); }
 function setTf(t) { currentTf = t; render(); }
 
-function moveStock(list, idx, dir) {
-  if (list !== 'a') return;
+let dragIdx = null;
+
+function onDragStart(e, idx) {
+  dragIdx = idx;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  dragIdx = null;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function onDragEnter(e, idx) {
+  e.preventDefault();
+  if (idx !== dragIdx) {
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    e.currentTarget.classList.add('drag-over');
+  }
+}
+
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onDrop(e, targetIdx) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (dragIdx === null || dragIdx === targetIdx) return;
   const withData = allStocks.filter(s => s.timeframes && Object.keys(s.timeframes).length > 0);
   if (!customOrder) {
     customOrder = [...withData].sort((a,b) => getChangePct(b) - getChangePct(a)).map(s => s.ticker);
   }
-  const target = idx + dir;
-  if (target < 0 || target >= customOrder.length) return;
-  [customOrder[idx], customOrder[target]] = [customOrder[target], customOrder[idx]];
+  const [moved] = customOrder.splice(dragIdx, 1);
+  customOrder.splice(targetIdx, 0, moved);
+  dragIdx = null;
   render();
 }
 
@@ -366,11 +402,16 @@ async function fetchData() {
     const data = await resp.json();
     if (data.stocks && data.stocks.length) {
       allStocks = data.stocks;
-      indicesData = data.indices || [];
-      earningsData = data.earnings || [];
       window._lastUpdated = data.updated;
-      render();
     }
+    // Only update indices/earnings if present (avoid clearing on partial responses)
+    if (data.indices && data.indices.length) {
+      indicesData = data.indices;
+    }
+    if (data.earnings && data.earnings.length) {
+      earningsData = data.earnings;
+    }
+    if (allStocks.length) render();
   } catch(e) {
     console.error('Fetch failed:', e);
   }
